@@ -46,8 +46,8 @@ jobs:
           ./scripts/feeds install lua luci-base etherwake curl
           # 非交互式生成 .config，避免 menuconfig 需要终端
           make defconfig
-          # 先编译 lua，确保 lua.h 在 staging 目录（否则 lucihttp 编译会报 fatal error: lua.h: No such file）
-          make package/lua/compile V=s -j1
+          # 先编译 luci-base（会按依赖链自动编译 lua → lucihttp → luci-base）
+          make package/feeds/luci/luci-base/compile V=s -j1
           make package/luci-app-wol-remote/compile V=s
 
       - name: Upload .ipk artifact

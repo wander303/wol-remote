@@ -1,0 +1,52 @@
+name: Build luci-app-wol-remote.ipk (ImmortalWrt 24.10.5)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'openwrt/**'
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # H3C Magic NX30 Pro → mediatek/filogic (MT7981, aarch64_cortex-a53)
+        target:
+          - name: mediatek-filogic
+            target_path: mediatek/filogic
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd
+
+      - name: Download ImmortalWrt SDK
+        run: |
+          SDK_URL="https://downloads.immortalwrt.org/releases/24.10.5/targets/${{ matrix.target.target_path }}/immortalwrt-sdk-24.10.5-${{ matrix.target.name }}_gcc-13.3.0_musl.Linux-x86_64.tar.zst"
+          echo "Downloading: $SDK_URL"
+          wget -q "$SDK_URL" -O sdk.tar.zst
+          tar --zstd -xf sdk.tar.zst
+          mv immortalwrt-sdk-*/ sdk/
+
+      - name: Copy package source
+        run: |
+          mkdir -p sdk/package/luci-app-wol-remote
+          cp -r openwrt/luci-app-wol-remote/* sdk/package/luci-app-wol-remote/
+
+      - name: Update feeds and compile
+        run: |
+          cd sdk
+          ./scripts/feeds update packages luci
+          ./scripts/feeds install -a
+          make package/luci-app-wol-remote/compile V=s
+
+      - name: Upload .ipk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luci-app-wol-remote-mediatek-filogic
+          path: sdk/bin/packages/**/luci-app-wol-remote*.ipk

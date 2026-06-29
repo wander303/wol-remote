@@ -1,0 +1,28 @@
+# 远程唤醒 (WOL Remote) 配置文件
+# 通过 uci set/get 或 LuCI Web 界面修改
+
+config wol-remote 'settings'
+    # 启用远程唤醒服务（1=启用, 0=禁用）
+    option enabled '1'
+
+    # serverhost 的完整 URL（要求 HTTPS）
+    option server_url 'https://your-server.com'
+
+    # API 认证令牌（必须与 serverhost config.py 一致）
+    option api_token ''
+
+    # 受控主机名称标识（用于多设备区分）
+    option host_name 'homehost'
+
+    # 受控主机的 MAC 地址（etherwake 使用）
+    option mac_address 'xx:xx:xx:xx:xx:xx'
+
+    # OpenWrt 上连接 homehost 的 LAN 接口
+    # 通常为 br-lan（桥接），也可能是 eth0/eth1
+    option lan_interface 'br-lan'
+
+    # 轮询间隔（秒），建议 15-30 秒
+    option poll_interval '15'
+
+    # 启动时是否自动发送一次 ACK（清空重启前的 pending 状态）
+    option ack_wake_on_boot '1'

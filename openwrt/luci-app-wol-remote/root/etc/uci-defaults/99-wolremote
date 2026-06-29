@@ -1,0 +1,20 @@
+#!/bin/sh
+# 首次安装时执行：设置默认参数提示 & 开机启动服务
+
+. /lib/functions/uci-defaults.sh
+
+# 提示用户修改配置
+logger -t "wolremote" "============================================================"
+logger -t "wolremote" "  感谢安装 luci-app-wol-remote！"
+logger -t "wolremote" "  请通过 LuCI 菜单 服务 > WOL Remote 或"
+logger -t "wolremote" "  执行 uci set 命令完成以下配置："
+logger -t "wolremote" "    1. server_url    - serverhost 的地址"
+logger -t "wolremote" "    2. api_token     - API 认证令牌"
+logger -t "wolremote" "    3. mac_address   - homehost MAC 地址"
+logger -t "wolremote" "  配置完成后执行：/etc/init.d/wolremote enable && /etc/init.d/wolremote start"
+logger -t "wolremote" "============================================================"
+
+# 启用开机自启
+/etc/init.d/wolremote enable
+
+exit 0

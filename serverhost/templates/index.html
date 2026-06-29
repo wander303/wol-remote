@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>远程开机 - WOL Remote</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🔌 远程开机</h1>
+    <p class="subtitle">通过 serverhost 唤醒 homehost</p>
+  </header>
+
+  <main>
+    <!-- 状态卡片 -->
+    <section class="card status-card" id="statusCard">
+      <div class="status-row">
+        <span class="label">homehost 状态</span>
+        <span class="badge" id="hostStatus">--</span>
+      </div>
+      <div class="status-row">
+        <span class="label">最后唤醒</span>
+        <span class="value" id="lastWake">--</span>
+      </div>
+      <div class="status-row">
+        <span class="label">最后确认</span>
+        <span class="value" id="lastAck">--</span>
+      </div>
+    </section>
+
+    <!-- 唤醒操作 -->
+    <section class="card action-card">
+      <button class="btn-wake" id="wakeBtn" onclick="triggerWake()">
+        <span class="btn-icon">⚡</span>
+        <span class="btn-text">唤醒 homehost</span>
+      </button>
+      <p class="hint" id="wakeHint">点击按钮发送唤醒指令</p>
+
+      <div class="loading hidden" id="loading">
+        <span class="spinner"></span> 处理中...
+      </div>
+    </section>
+
+    <!-- 历史记录 -->
+    <section class="card history-card">
+      <div class="card-header">
+        <h2>📋 唤醒记录</h2>
+        <button class="btn-refresh" onclick="loadHistory()" title="刷新">↻</button>
+      </div>
+      <div class="history-list" id="historyList">
+        <p class="empty-hint">暂无记录</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>WOL Remote &middot; <span id="serverTime"></span></p>
+  </footer>
+</div>
+
+<script>
+const API_BASE = '';
+let token = '';
+
+// ── Token 输入弹窗 ──────────────────────────────────────────────
+(function promptToken() {
+  const saved = sessionStorage.getItem('wol_api_token');
+  if (saved) { token = saved; return; }
+  const t = prompt('请输入 API Token：');
+  if (t) { token = t; sessionStorage.setItem('wol_api_token', t); }
+})();
+
+// ── 通用 API 请求 ───────────────────────────────────────────────
+async function apiFetch(path, options = {}) {
+  const headers = { 'X-API-Token': token, ...options.headers };
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (res.status === 401) {
+    sessionStorage.removeItem('wol_api_token');
+    location.reload();
+  }
+  return res;
+}
+
+// ── 查询状态 ────────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const res = await apiFetch('/api/status');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const badge = document.getElementById('hostStatus');
+    if (data.last_ack) {
+      const ackTime = new Date(data.last_ack + 'Z').getTime();
+      const now = Date.now();
+      const diff = now - ackTime;
+      // 5 分钟内确认过 → 认为在线
+      if (diff < 5 * 60 * 1000) {
+        badge.textContent = '在线';
+        badge.className = 'badge online';
+      } else {
+        badge.textContent = '离线';
+        badge.className = 'badge offline';
+      }
+    } else {
+      badge.textContent = '未知';
+      badge.className = 'badge unknown';
+    }
+
+    document.getElementById('lastWake').textContent =
+        data.last_wake ? new Date(data.last_wake + 'Z').toLocaleString('zh-CN') : '--';
+    document.getElementById('lastAck').textContent =
+        data.last_ack ? new Date(data.last_ack + 'Z').toLocaleString('zh-CN') : '--';
+
+    // 有 pending 任务时禁用按钮
+    if (data.pending) {
+      document.getElementById('wakeBtn').disabled = true;
+      document.getElementById('wakeHint').textContent = '⏳ 唤醒指令已发送，等待 OpenWrt 执行...';
+    } else {
+      document.getElementById('wakeBtn').disabled = false;
+    }
+  } catch (e) {
+    console.error('状态查询失败', e);
+  }
+}
+
+// ── 触发唤醒 ────────────────────────────────────────────────────
+async function triggerWake() {
+  const btn = document.getElementById('wakeBtn');
+  const hint = document.getElementById('wakeHint');
+  const loading = document.getElementById('loading');
+  btn.disabled = true;
+  loading.classList.remove('hidden');
+
+  try {
+    const res = await apiFetch('/api/wake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    const data = await res.json();
+
+    if (data.status === 'queued') {
+      hint.textContent = '✅ 唤醒指令已排队，将在 15 秒内执行';
+    } else if (data.status === 'already_queued') {
+      hint.textContent = '⏳ 已有等待中的唤醒请求，请耐心等待';
+    } else {
+      hint.textContent = '❌ 指令发送失败，请重试';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    hint.textContent = '❌ 网络错误，请检查连接后重试';
+    btn.disabled = false;
+  } finally {
+    loading.classList.add('hidden');
+    // 延迟重新查询状态
+    setTimeout(loadStatus, 2000);
+  }
+}
+
+// ── 加载历史记录 ────────────────────────────────────────────────
+async function loadHistory() {
+  const list = document.getElementById('historyList');
+  try {
+    const res = await apiFetch('/api/history');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (!data.entries || data.entries.length === 0) {
+      list.innerHTML = '<p class="empty-hint">暂无记录</p>';
+      return;
+    }
+
+    list.innerHTML = data.entries.reverse().map(line => {
+      const cls = line.includes('WAKE_QUEUED') ? 'entry-wake' :
+                  line.includes('WAKE_ACK') ? 'entry-ack' : '';
+      return `<div class="history-entry ${cls}">${escapeHtml(line)}</div>`;
+    }).join('');
+  } catch (e) {
+    console.error('加载历史失败', e);
+  }
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+// ── 定时刷新 ────────────────────────────────────────────────────
+loadStatus();
+loadHistory();
+document.getElementById('serverTime').textContent = new Date().toLocaleString('zh-CN');
+setInterval(loadStatus, 10000);    // 每 10 秒刷新状态
+setInterval(loadHistory, 60000);   // 每 60 秒刷新历史
+</script>
+</body>
+</html>

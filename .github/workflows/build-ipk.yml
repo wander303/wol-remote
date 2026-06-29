@@ -42,12 +42,12 @@ jobs:
         run: |
           cd sdk
           ./scripts/feeds update packages luci
-          # 只安装所需依赖，避免 luci-app-diskman 等有递归依赖 bug 的包
-          ./scripts/feeds install lua luci-base etherwake curl
-          # 非交互式生成 .config，避免 menuconfig 需要终端
+          # luci-base/etc from luci feed, etherwake/curl from packages feed
+          # lua 是核心包 (package/utils/lua/) 不在 feeds 里，不需要 install
+          ./scripts/feeds install luci-base etherwake curl
           make defconfig
-          # 先编译 lua，把 lua.h 等头文件安装到 staging（lucihttp 编译时需要）
-          make package/feeds/packages/lua/compile V=s -j1
+          # 先编译核心包 lua，安装 lua.h 到 staging 目录（lucihttp 编译时需要）
+          make package/utils/lua/compile V=s -j1
           make package/luci-app-wol-remote/compile V=s
 
       - name: Upload .ipk artifact

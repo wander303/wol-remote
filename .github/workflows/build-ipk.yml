@@ -43,9 +43,11 @@ jobs:
           cd sdk
           ./scripts/feeds update packages luci
           # 只安装所需依赖，避免 luci-app-diskman 等有递归依赖 bug 的包
-          ./scripts/feeds install luci-base etherwake curl
+          ./scripts/feeds install lua luci-base etherwake curl
           # 非交互式生成 .config，避免 menuconfig 需要终端
           make defconfig
+          # 先编译 lua，确保 lua.h 在 staging 目录（否则 lucihttp 编译会报 fatal error: lua.h: No such file）
+          make package/lua/compile V=s -j1
           make package/luci-app-wol-remote/compile V=s
 
       - name: Upload .ipk artifact

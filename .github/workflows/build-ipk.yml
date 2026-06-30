@@ -5,17 +5,18 @@ on:
     branches: [main]
     paths:
       - 'openwrt/**'
-  workflow_dispatch:  # 手动触发
+      - '.github/workflows/build-ipk.yml'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # H3C Magic NX30 Pro → mediatek/filogic (MT7981, aarch64_cortex-a53)
         target:
           - name: mediatek-filogic
             target_path: mediatek/filogic
+            arch: aarch64_cortex-a53
 
     steps:
       - uses: actions/checkout@v4
@@ -23,35 +24,59 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq zstd
+          sudo apt-get install -y -qq build-essential wget file zstd \
+            python3 python3-dev unzip git rsync
 
-      - name: Download ImmortalWrt SDK
+      - name: Clone ImmortalWrt buildroot
+        run: |
+          git clone --depth=1 -b v24.10.5 https://github.com/immortalwrt/immortalwrt.git buildroot
+
+      - name: Download SDK (for prebuilt toolchain + .config)
         run: |
           SDK_URL="https://downloads.immortalwrt.org/releases/24.10.5/targets/${{ matrix.target.target_path }}/immortalwrt-sdk-24.10.5-${{ matrix.target.name }}_gcc-13.3.0_musl.Linux-x86_64.tar.zst"
-          echo "Downloading: $SDK_URL"
+          echo "Downloading SDK: $SDK_URL"
           wget -q "$SDK_URL" -O sdk.tar.zst
           tar --zstd -xf sdk.tar.zst
           mv immortalwrt-sdk-*/ sdk/
 
-      - name: Copy package source
+      - name: Use SDK toolchain + target .config in buildroot
         run: |
-          mkdir -p sdk/package/luci-app-wol-remote
-          cp -r openwrt/luci-app-wol-remote/* sdk/package/luci-app-wol-remote/
+          # 使用 SDK 的预编译 aarch64 交叉工具链（替换 buildroot 的默认 staging_dir）
+          rm -rf buildroot/staging_dir buildroot/dl buildroot/.config
+          cp -r sdk/staging_dir buildroot/
+          cp -r sdk/dl buildroot/ 2>/dev/null || true
 
-      - name: Update feeds and compile
-        run: |
-          cd sdk
-          ./scripts/feeds update packages luci
-          # luci-base/etc from luci feed, etherwake/curl from packages feed
-          # lua 是核心包 (package/utils/lua/) 不在 feeds 里，不需要 install
-          ./scripts/feeds install luci-base etherwake curl
+          cd buildroot
+          # 先设置正确的目标架构为 mediatek/filogic
+          echo "CONFIG_TARGET_mediatek=y" > .config
+          echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
           make defconfig
-          # 先编译核心包 lua，安装 lua.h 到 staging 目录（lucihttp 编译时需要）
-          make package/utils/lua/compile V=s -j1
-          make package/luci-app-wol-remote/compile V=s
+
+          # 添加我们的包
+          echo "CONFIG_PACKAGE_luci-app-wol-remote=m" >> .config
+          make defconfig
+
+      - name: Setup feeds and package
+        run: |
+          cd buildroot
+          ./scripts/feeds update packages luci
+          ./scripts/feeds install luci-base luci-lua-runtime etherwake curl
+
+          # 复制我们的 luci-app 源码
+          mkdir -p package/luci-app-wol-remote
+          cp -r /home/runner/work/wol-remote/wol-remote/openwrt/luci-app-wol-remote/* package/luci-app-wol-remote/
+
+          # 确保包已启用（make defconfig 后可能重置，再次设置）
+          echo "CONFIG_PACKAGE_luci-app-wol-remote=m" >> .config
+          make defconfig
+
+      - name: Compile luci-app-wol-remote
+        run: |
+          cd buildroot
+          make package/luci-app-wol-remote/compile V=s -j$(nproc)
 
       - name: Upload .ipk artifact
         uses: actions/upload-artifact@v4
         with:
-          name: luci-app-wol-remote-mediatek-filogic
-          path: sdk/bin/packages/**/luci-app-wol-remote*.ipk
+          name: luci-app-wol-remote-${{ matrix.target.name }}
+          path: buildroot/bin/packages/**/luci-app-wol-remote*.ipk

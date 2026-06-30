@@ -20,3 +20,19 @@
 - **影响范围**: GitHub Actions CI 构建流程
 - **验证**: 最终构建 5m57s ✅，artifact 正确上传
 - **回滚**: 使用 `git revert` 回退
+
+## 2026-06-30 — fix: 修复 init.d 和 poll 脚本权限（644→755）
+- **分支**: `main`（直接提交）
+- **变更文件**: `openwrt/luci-app-wol-remote/root/etc/init.d/wolremote`, `openwrt/luci-app-wol-remote/root/usr/bin/wol-poll.sh`
+- **原因**: git 中文件权限为 644，打包进 ipk 后 init 脚本无执行权限，安装时 `postinst` 调用 `/etc/init.d/wolremote enable` 失败（Permission denied）
+- **影响范围**: LuCI 包安装流程
+- **验证**: git ls-files --stage 显示 100755 ✅，需 CI 重新构建后验证安装
+- **回滚**: `git revert` 回退
+
+## 2026-07-01 — fix: 修复 LuCI 控制器 Lua 语法错误（尾逗号 + 注释）
+- **分支**: `main`
+- **变更文件**: `openwrt/luci-app-wol-remote/luasrc/controller/wolremote.lua`
+- **原因**: `entry()` 调用第三参数 `_("WOL Remote")` 后有多余逗号和注释行，Lua 5.1 将注释视为空白，逗号后紧跟 `)` 导致语法错误 `unexpected symbol near ')'`，LuCI 页面 500 错误
+- **影响范围**: LuCI 管理页面 → 服务 → WOL Remote
+- **验证**: 修复后在 LuCI 页面刷新不再报错 ✅
+- **回滚**: `git revert` 回退

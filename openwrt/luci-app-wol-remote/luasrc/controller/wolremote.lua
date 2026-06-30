@@ -7,13 +7,11 @@
 module("luci.controller.wolremote", package.seeall)
 
 function index()
-    -- 入口：Services → WOL Remote（I18n 可用，但此处用固定字符串）
+    -- 入口：Services → WOL Remote
     entry(
         {"admin", "services", "wolremote"},
         cbi("wolremote"),
-        _("WOL Remote"),
-        -- 图标（Font Awesome 4.7，可选）
-        -- 使用 "plug" 图标表示远程唤醒
+        _("WOL Remote")
     ).dependent = false
 
     -- 注册 ACL（访问控制）

@@ -71,7 +71,7 @@ const HTML = `<!DOCTYPE html>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f0f2f5;color:#333;min-height:100vh;display:flex;align-items:center;justify-content:center}
 .card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:32px;width:100%;max-width:420px;margin:20px}
-h1{font-size:22px;font-weight:600;margin-bottom:4px;color:#1a1a2e}
+h1{font-size:24px;font-weight:600;margin-bottom:4px;color:#1a1a2e}
 .subtitle{font-size:13px;color:#888;margin-bottom:24px}
 .field{margin-bottom:16px}
 label{display:block;font-size:13px;font-weight:500;color:#555;margin-bottom:4px}
@@ -97,15 +97,15 @@ input:focus{border-color:#4f46e5}
 </head>
 <body>
 <div class="card">
-  <h1>&#9889; WOL Remote</h1>
-  <div class="subtitle">远程唤醒控制面板</div>
+  <h1>[ WOL Remote ] 远程唤醒</h1>
+  <div class="subtitle">Cloudflare Worker - 控制面板</div>
   <div class="field">
     <label for="token">API Token</label>
     <input type="password" id="token" placeholder="输入 API Token" autocomplete="off">
   </div>
   <div class="row">
-    <button class="btn btn-primary" id="btnWake" onclick="doWake()">&#128276; 触发唤醒</button>
-    <button class="btn btn-outline" onclick="doRefresh()">&#128260; 刷新</button>
+    <button class="btn btn-primary" id="btnWake" onclick="doWake()">[ 触发唤醒 ]</button>
+    <button class="btn btn-outline" onclick="doRefresh()">[ 刷新 ]</button>
   </div>
   <div class="status-box" id="statusBox"></div>
   <div class="msg" id="msg"></div>
@@ -113,23 +113,23 @@ input:focus{border-color:#4f46e5}
 <script>
 const BASE = window.location.origin;
 function $(id){return document.getElementById(id)}
-function msg(text,type){const el=$('msg');el.textContent=text;el.className='msg show msg-'+type;setTimeout(()=>el.classList.remove('show'),3000)}
+function msg(text,type){var el=$('msg');el.textContent=text;el.className='msg show msg-'+type;setTimeout(function(){el.classList.remove('show')},3000)}
 function token(){return $('token').value.trim()}
-function qs(){const t=token();return t?'?token='+encodeURIComponent(t):''}
-async function api(path,opts){const t=token();if(!t){msg('请先输入 Token','err');return null}
-const res=await fetch(BASE+path+qs(),{headers:t?{'X-API-Token':t}:{},...opts});if(res.status===401){msg('Token 无效','err');return null};return res}
-async function doRefresh(){const res=await api('/api/status');if(!res)return;const d=await res.json()
-const box=$('statusBox');box.className='status-box show '+(d.pending?'status-wake':'status-idle')
-box.innerHTML=d.pending?'<span class="badge badge-wake">&#128992; 有待唤醒</span>':'<span class="badge badge-idle">&#128994; 空闲</span>'
+function qs(){var t=token();return t?'?token='+encodeURIComponent(t):''}
+async function api(path,opts){var t=token();if(!t){msg('请先输入 Token','err');return null}
+var res=await fetch(BASE+path+qs(),{headers:t?{'X-API-Token':t}:{},...opts});if(res.status===401){msg('Token 无效','err');return null};return res}
+async function doRefresh(){var res=await api('/api/status');if(!res)return;var d=await res.json()
+var box=$('statusBox');box.className='status-box show '+(d.pending?'status-wake':'status-idle')
+box.innerHTML=d.pending?'[ 有待唤醒 ]':'[ 空闲 ]'
 box.innerHTML+='<br><br>';if(d.last_wake)box.innerHTML+='上次唤醒: '+new Date(d.last_wake).toLocaleString()+'<br>'
 if(d.last_ack)box.innerHTML+='上次确认: '+new Date(d.last_ack).toLocaleString()+'<br>'
 if(!d.last_wake&&!d.last_ack)box.innerHTML+='暂无记录'}
-async function doWake(){const btn=$('btnWake');btn.disabled=true;const res=await api('/api/wake',{method:'POST'});btn.disabled=false
-if(!res)return;const d=await res.json()
-if(d.status==='queued'){msg('&#9989; 唤醒请求已发送','ok');doRefresh()}
-else if(d.status==='already_queued'){msg('&#9203; 已有待处理的唤醒','ok');doRefresh()}}
-$('token').addEventListener('input',()=>{if(token())doRefresh()})
-$('token').addEventListener('keydown',e=>{if(e.key==='Enter')doWake()})
+async function doWake(){var btn=$('btnWake');btn.disabled=true;var res=await api('/api/wake',{method:'POST'});btn.disabled=false
+if(!res)return;var d=await res.json()
+if(d.status==='queued'){msg('唤醒请求已发送','ok');doRefresh()}
+else if(d.status==='already_queued'){msg('已有待处理的唤醒','ok');doRefresh()}}
+document.getElementById('token').addEventListener('input',function(){if(token())doRefresh()})
+document.getElementById('token').addEventListener('keydown',function(e){if(e.key==='Enter')doWake()})
 </script>
 </body>
 </html>`;

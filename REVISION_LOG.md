@@ -36,3 +36,11 @@
 - **影响范围**: LuCI 管理页面 → 服务 → WOL Remote
 - **验证**: 修复后在 LuCI 页面刷新不再报错 ✅
 - **回滚**: `git revert` 回退
+
+## 2026-07-01 — fix: ACK 请求 Token 认证方式错误导致无限唤醒循环
+- **分支**: `main`
+- **变更文件**: `openwrt/luci-app-wol-remote/root/usr/bin/wol-poll.sh`
+- **原因**: `wol-poll.sh` 对 `/api/ack` 调用将 Token 放在 JSON body 中（`{"token":"..."}`），但 Worker `checkAuth()` 只检查 `X-API-Token` Header 和 `?token=` Query Param，不解析 JSON body。ACK 始终返回 401，pending 状态保持 "WAKE"，下次 polling 又拿到 "WAKE" → 一直发 etherwake → 死循环
+- **影响范围**: WOL Remote 轮询唤醒功能
+- **验证**: ACK 使用 query param 后认证通过，pending 正确重置为 IDLE ✅
+- **回滚**: `git revert` 回退

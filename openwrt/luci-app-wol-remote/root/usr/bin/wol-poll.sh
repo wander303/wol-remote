@@ -46,9 +46,7 @@ poll_once() {
 
             # 确认执行
             curl -s --connect-timeout 10 --max-time 15 \
-                -X POST "${SERVER_URL}/api/ack" \
-                -H "Content-Type: application/json" \
-                -d "{\"token\":\"${API_TOKEN}\", \"host\":\"${HOST_NAME}\"}" \
+                -X POST "${SERVER_URL}/api/ack?token=${API_TOKEN}&host=${HOST_NAME}" \
                 >/dev/null 2>&1 || logger -t "wolremote" "确认回执发送失败"
 
             logger -t "wolremote" "唤醒确认已提交"
@@ -71,9 +69,7 @@ main() {
     read_config
     if [ "$ACK_BOOT" = "1" ] && [ -n "$SERVER_URL" ] && [ -n "$API_TOKEN" ]; then
         curl -s --connect-timeout 10 --max-time 15 \
-            -X POST "${SERVER_URL}/api/ack" \
-            -H "Content-Type: application/json" \
-            -d "{\"token\":\"${API_TOKEN}\", \"host\":\"${HOST_NAME}\"}" \
+            -X POST "${SERVER_URL}/api/ack?token=${API_TOKEN}&host=${HOST_NAME}" \
             >/dev/null 2>&1 || true
     fi
 
